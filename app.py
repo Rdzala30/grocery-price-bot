@@ -9,24 +9,7 @@ from searcher import build_price_context
 
 # Configure Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
-
-# List available models for debugging (check Render logs)
-try:
-    print("--- AVAILABLE MODELS ---")
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"Available: {m.name}")
-except Exception as e:
-    print(f"DEBUG: Could not list models: {e}")
-
-# Try to initialize the model, fallback to gemini-pro if flash is missing
-try:
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    # Quick test to see if it's available
-    print("Using model: gemini-1.5-flash")
-except Exception:
-    print("Fallback: Using gemini-pro")
-    model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 app = Flask(__name__)
 
