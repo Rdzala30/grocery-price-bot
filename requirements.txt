@@ -1,0 +1,7 @@
+flask
+requests
+google-generativeai
+ddgs
+python-dotenv
+gunicorn
+playwright
