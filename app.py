@@ -14,14 +14,15 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 
 app = Flask(__name__)
 
-def send_telegram_message(chat_id, text):
+def send_telegram_message(chat_id, text, parse_mode="Markdown"):
     """Sends a message back to the user via Telegram Bot API."""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
+        "text": text
     }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     try:
         response = requests.post(url, json=payload)
         response.raise_for_status()
@@ -35,8 +36,10 @@ def process_and_reply(chat_id, items):
         send_telegram_message(chat_id, analysis)
     except Exception as e:
         # Send full traceback to Telegram as requested for debugging
-        error_trace = traceback.format_exc()
-        send_telegram_message(chat_id, f"DEBUG ERROR:\n{error_trace}")
+        # Truncate to avoid exceeding Telegram's 4096 character limit
+        error_trace = traceback.format_exc()[:4000]
+        # Use parse_mode=None because tracebacks often contain characters that break Markdown
+        send_telegram_message(chat_id, f"DEBUG ERROR:\n{error_trace}", parse_mode=None)
 
 def compare_prices(grocery_list):
     """Gets search context and uses Gemini to compare prices."""
