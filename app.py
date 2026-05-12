@@ -1,4 +1,5 @@
 from flask import Flask, request
+import threading
 import google.generativeai as genai
 import requests
 import os
@@ -24,6 +25,11 @@ def send_telegram_message(chat_id, text):
         response.raise_for_status()
     except Exception as e:
         print(f"Error sending Telegram message: {e}")
+
+def process_and_reply(chat_id, items):
+    """Background task to fetch prices and send analysis back to user."""
+    analysis = compare_prices(items)
+    send_telegram_message(chat_id, analysis)
 
 def compare_prices(grocery_list):
     """Gets search context and uses Gemini to compare prices."""
@@ -93,11 +99,10 @@ def webhook():
         # Notify user that search is starting
         send_telegram_message(chat_id, "🔍 *Searching prices across platforms...* This may take a minute.")
         
-        # Perform comparison
-        analysis = compare_prices(items)
-        
-        # Send final analysis back
-        send_telegram_message(chat_id, analysis)
+        # Start background thread to handle searching and Gemini analysis
+        # This prevents Telegram from timing out and sending duplicate requests
+        thread = threading.Thread(target=process_and_reply, args=(chat_id, items))
+        thread.start()
         
     return "OK", 200
 
