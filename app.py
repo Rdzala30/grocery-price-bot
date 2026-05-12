@@ -1,5 +1,6 @@
 from flask import Flask, request
 import threading
+import traceback
 import google.generativeai as genai
 import requests
 import os
@@ -8,7 +9,8 @@ from searcher import build_price_context
 
 # Configure Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+# Using gemini-1.5-flash for broader availability and speed
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 app = Flask(__name__)
 
@@ -28,32 +30,38 @@ def send_telegram_message(chat_id, text):
 
 def process_and_reply(chat_id, items):
     """Background task to fetch prices and send analysis back to user."""
-    analysis = compare_prices(items)
-    send_telegram_message(chat_id, analysis)
+    try:
+        analysis = compare_prices(items)
+        send_telegram_message(chat_id, analysis)
+    except Exception as e:
+        # Send full traceback to Telegram as requested for debugging
+        error_trace = traceback.format_exc()
+        send_telegram_message(chat_id, f"DEBUG ERROR:\n{error_trace}")
 
 def compare_prices(grocery_list):
     """Gets search context and uses Gemini to compare prices."""
-    try:
-        # Get search results context
-        context = build_price_context(grocery_list)
-        
-        # Prepare AI prompt
-        prompt = (
-            "You are a smart grocery shopping assistant for Indian users. "
-            "Based on these web search results, for each grocery item tell me: "
-            "(1) estimated price on each platform, (2) which platform is cheapest. "
-            "End with a final summary table showing the cheapest option for each item. "
-            "Use ₹ symbol. Format the response cleanly with emojis for readability. "
-            "If price data is unclear, say 'Price unclear' rather than guessing.\n\n"
-            f"SEARCH CONTEXT:\n{context}"
-        )
-        
-        # Generate response using Gemini
-        response = model.generate_content(prompt)
+    # Get search results context
+    context = build_price_context(grocery_list)
+    
+    # Prepare AI prompt
+    prompt = (
+        "You are a smart grocery shopping assistant for Indian users. "
+        "Based on these web search results, for each grocery item tell me: "
+        "(1) estimated price on each platform, (2) which platform is cheapest. "
+        "End with a final summary table showing the cheapest option for each item. "
+        "Use ₹ symbol. Format the response cleanly with emojis for readability. "
+        "If price data is unclear, say 'Price unclear' rather than guessing.\n\n"
+        f"SEARCH CONTEXT:\n{context}"
+    )
+    
+    # Generate response using Gemini
+    response = model.generate_content(prompt)
+    
+    # Check if response has text (Gemini sometimes blocks content)
+    if response and response.text:
         return response.text
-    except Exception as e:
-        print(f"Price comparison logic failed: {e}")
-        return "❌ Sorry, I encountered an error while comparing prices. Please try again later."
+    else:
+        return "⚠️ Gemini AI was unable to generate a comparison for these items. The search data might be unclear."
 
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
