@@ -3,12 +3,12 @@ import threading
 import traceback
 import requests
 import os
-from config import TELEGRAM_TOKEN
+from config import TELEGRAM_TOKEN, GROQ_API_KEY
 from searcher import build_price_context
 from groq import Groq
 
 # Configure Groq
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+client = Groq(api_key=GROQ_API_KEY)
 
 app = Flask(__name__)
 
