@@ -1,15 +1,14 @@
 from flask import Flask, request
 import threading
 import traceback
-import google.generativeai as genai
 import requests
 import os
-from config import TELEGRAM_TOKEN, GEMINI_API_KEY
+from config import TELEGRAM_TOKEN
 from searcher import build_price_context
+from groq import Groq
 
-# Configure Gemini AI
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+# Configure Groq
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 app = Flask(__name__)
 
@@ -56,14 +55,13 @@ def compare_prices(grocery_list):
         f"SEARCH CONTEXT:\n{context}"
     )
     
-    # Generate response using Gemini
-    response = model.generate_content(prompt)
-    
-    # Check if response has text (Gemini sometimes blocks content)
-    if response and response.text:
-        return response.text
-    else:
-        return "⚠️ Gemini AI was unable to generate a comparison for these items. The search data might be unclear."
+    # Generate response using Groq
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
+    )
+    return response.choices[0].message.content
 
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
@@ -93,7 +91,7 @@ def webhook():
             "💡 *How to use:*\n"
             "1. Type your grocery list with each item on a new line.\n"
             "2. I will search multiple platforms for you.\n"
-            "3. Gemini AI will analyze the results and tell you where to buy!\n\n"
+            "3. Groq AI will analyze the results and tell you where to buy!\n\n"
             "Currently searching: Blinkit, Zepto, Swiggy Instamart, Amazon Fresh."
         )
         send_telegram_message(chat_id, msg)
@@ -109,7 +107,7 @@ def webhook():
         # Notify user that search is starting
         send_telegram_message(chat_id, "🔍 *Searching prices across platforms...* This may take a minute.")
         
-        # Start background thread to handle searching and Gemini analysis
+        # Start background thread to handle searching and AI analysis
         # This prevents Telegram from timing out and sending duplicate requests
         thread = threading.Thread(target=process_and_reply, args=(chat_id, items))
         thread.start()

@@ -1,6 +1,6 @@
 flask
 requests
-google-generativeai
+groq
 ddgs
 python-dotenv
 gunicorn
