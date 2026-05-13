@@ -31,9 +31,10 @@ def enrich_grocery_list(items):
     """Uses AI to convert generic items into popular brand-specific queries for better search results."""
     prompt = (
         "You are a grocery assistant in India. Rewrite the following list of generic grocery items "
-        "into specific, popular branded item names that would yield better search results on Indian grocery apps "
+        "into concise, popular brand names that would yield better search results on Indian grocery apps "
         "(like Blinkit or Swiggy Instamart). "
-        "For example, 'Milk 1L' -> 'Amul Taaza Toned Milk 1L'. "
+        "For example, 'Milk 1L' -> 'Amul Milk 1L', 'Salt' -> 'Tata Salt 1kg'. "
+        "IMPORTANT: Keep names SHORT and concise (max 3-5 words). Avoid overly long descriptions. "
         "Return ONLY the rewritten list, one item per line, with no extra text or numbering.\n\n"
         "Original list:\n" + "\n".join(items)
     )
