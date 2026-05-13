@@ -4,4 +4,3 @@ groq
 ddgs
 python-dotenv
 gunicorn
-playwright
