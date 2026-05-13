@@ -1,7 +1,6 @@
 flask
 requests
 groq
-ddgs
+duckduckgo-search
 python-dotenv
 gunicorn
-playwright
