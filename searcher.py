@@ -1,28 +1,49 @@
 import time
+import re
 from ddgs import DDGS
 
 def search_item_price(item_name, platform):
     """
     Searches DuckDuckGo for the price of a specific item on a given platform in India.
-    Returns the top 3 result snippets joined as a string.
+    Runs multiple query variations to maximize useful snippets.
+    Returns the combined snippets and extracted prices.
     """
-    query = f"{item_name} price {platform} India"
+    queries = [
+        f"{item_name} {platform} price India",
+        f"{item_name} {platform} today",
+        f"{item_name} {platform} app"
+    ]
+    
+    all_snippets = []
+    
     try:
-        # Use DDGS context manager to search DuckDuckGo
         with DDGS() as ddgs:
-            # Fetch top 3 results
-            results = ddgs.text(query, max_results=3)
-            snippets = [r['body'] for r in results if 'body' in r]
-            
-            # Add sleep to avoid rate limiting as requested.
-            # Note: Some items may return "No data found" if DuckDuckGo throttles rapid requests.
-            time.sleep(1)
-            
-            return " ".join(snippets)
+            for query in queries:
+                try:
+                    results = ddgs.text(query, max_results=2)
+                    for r in results:
+                        if 'body' in r and r['body'] not in all_snippets:
+                            all_snippets.append(r['body'])
+                    time.sleep(1) # sleep between variations
+                except Exception as e:
+                    print(f"Query '{query}' failed: {e}")
     except Exception as e:
-        # Return empty string on failure as requested
         print(f"Search failed for {platform}: {e}")
-        return ""
+        
+    combined_text = " ".join(all_snippets)
+    
+    # Extract prices using regex
+    # Matches: ₹34, Rs 45, ₹120.50, Rs. 100, etc.
+    prices = re.findall(r'(?:₹|Rs\.?\s*)\s?\d+(?:,\d+)*(?:\.\d{1,2})?', combined_text, re.IGNORECASE)
+    # Deduplicate while preserving order
+    unique_prices = list(dict.fromkeys(prices))
+    
+    if unique_prices:
+        extracted_info = f" [EXTRACTED PRICES: {', '.join(unique_prices)}]"
+    else:
+        extracted_info = ""
+        
+    return combined_text + extracted_info
 
 def get_prices_for_item(item_name):
     """

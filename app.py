@@ -27,10 +27,52 @@ def send_telegram_message(chat_id, text, parse_mode="Markdown"):
     except Exception as e:
         print(f"Error sending Telegram message: {e}")
 
+def enrich_grocery_list(items):
+    """Uses AI to convert generic items into popular brand-specific queries for better search results."""
+    prompt = (
+        "You are a grocery assistant in India. Rewrite the following list of generic grocery items "
+        "into specific, popular branded item names that would yield better search results on Indian grocery apps "
+        "(like Blinkit or Swiggy Instamart). "
+        "For example, 'Milk 1L' -> 'Amul Taaza Toned Milk 1L'. "
+        "Return ONLY the rewritten list, one item per line, with no extra text or numbering.\n\n"
+        "Original list:\n" + "\n".join(items)
+    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200
+        )
+        # Split by newline and clean up (removing bullets if AI added them)
+        enriched_items = []
+        for line in response.choices[0].message.content.split('\n'):
+            cleaned = line.strip()
+            if cleaned.startswith('-') or cleaned.startswith('*'):
+                cleaned = cleaned[1:].strip()
+            # Remove numbering like "1. "
+            import re
+            cleaned = re.sub(r'^\d+\.\s*', '', cleaned)
+            if cleaned:
+                enriched_items.append(cleaned)
+                
+        # Fallback to original if AI fails or returns empty
+        return enriched_items if enriched_items else items
+    except Exception as e:
+        print(f"Error enriching grocery list: {e}")
+        return items
+
 def process_and_reply(chat_id, items):
     """Background task to fetch prices and send analysis back to user."""
     try:
-        analysis = compare_prices(items)
+        send_telegram_message(chat_id, "✨ *Enhancing your list for better results...*")
+        enriched_items = enrich_grocery_list(items)
+        
+        # Show user the enriched items if they changed
+        if enriched_items != items:
+            enriched_msg = "🔍 *Searching for specific brands:*\n" + "\n".join([f"• {i}" for i in enriched_items])
+            send_telegram_message(chat_id, enriched_msg)
+            
+        analysis = compare_prices(enriched_items)
         send_telegram_message(chat_id, analysis)
     except Exception as e:
         # Send full traceback to Telegram as requested for debugging
@@ -45,15 +87,55 @@ def compare_prices(grocery_list):
     context = build_price_context(grocery_list)
     
     # Prepare AI prompt
-    prompt = (
-        "You are a smart grocery shopping assistant for Indian users. "
-        "Based on these web search results, for each grocery item tell me: "
-        "(1) estimated price on each platform, (2) which platform is cheapest. "
-        "End with a final summary table showing the cheapest option for each item. "
-        "Use ₹ symbol. Format the response cleanly with emojis for readability. "
-        "If price data is unclear, say 'Price unclear' rather than guessing.\n\n"
-        f"SEARCH CONTEXT:\n{context}"
-    )
+    prompt = f"""
+You are a premium grocery comparison assistant for Indian users.
+
+Analyze the grocery price data carefully.
+
+RULES:
+- Keep response visually clean and modern
+- Use emojis properly
+- NO markdown tables
+- NO ### headings
+- NO long paragraphs
+- Keep spacing clean
+- Use bullet formatting
+- Mention only useful information
+- If price is unavailable, write "Not Found"
+
+FORMAT EXACTLY LIKE THIS:
+
+🛒 Grocery Price Comparison
+
+🥛 Milk 1L
+• Blinkit: ₹68
+• Zepto: ₹70
+• Swiggy: ₹69
+• Amazon: ₹72
+✅ Cheapest: Blinkit (₹68)
+
+🧅 Onion 1kg
+• Blinkit: ₹34
+• Zepto: ₹35
+• Swiggy: ₹30
+• Amazon: ₹106
+✅ Cheapest: Swiggy (₹30)
+
+━━━━━━━━━━━━━━
+
+💰 Best Deals Summary
+• Milk 1L → Blinkit
+• Onion 1kg → Swiggy
+
+━━━━━━━━━━━━━━
+
+⚠️ Note:
+Prices are estimated from public web results and may vary slightly in-app.
+
+Here is the search data:
+
+{context}
+"""
     
     # Generate response using Groq
     response = client.chat.completions.create(
