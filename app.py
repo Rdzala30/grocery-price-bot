@@ -32,7 +32,7 @@ def enrich_grocery_list(items):
     prompt = (
         "You are a grocery assistant in India. Rewrite the following list of generic grocery items "
         "into concise, popular brand names that would yield better search results on Indian grocery apps "
-        "(like Blinkit or Swiggy Instamart). "
+        "(like BigBasket or JioMart). "
         "For example, 'Milk 1L' -> 'Amul Milk 1L', 'Salt' -> 'Tata Salt 1kg'. "
         "IMPORTANT: Keep names SHORT and concise (max 3-5 words). Avoid overly long descriptions. "
         "Return ONLY the rewritten list, one item per line, with no extra text or numbering.\n\n"
@@ -109,24 +109,20 @@ FORMAT EXACTLY LIKE THIS:
 🛒 Grocery Price Comparison
 
 🥛 Milk 1L
-• Blinkit: ₹68
-• Zepto: ₹70
-• Swiggy: ₹69
-• Amazon: ₹72
-✅ Cheapest: Blinkit (₹68)
+• BigBasket: ₹68
+• JioMart: ₹70
+✅ Cheapest: BigBasket (₹68)
 
 🧅 Onion 1kg
-• Blinkit: ₹34
-• Zepto: ₹35
-• Swiggy: ₹30
-• Amazon: ₹106
-✅ Cheapest: Swiggy (₹30)
+• BigBasket: ₹34
+• JioMart: ₹35
+✅ Cheapest: JioMart (₹34)
 
 ━━━━━━━━━━━━━━
 
 💰 Best Deals Summary
-• Milk 1L → Blinkit
-• Onion 1kg → Swiggy
+• Milk 1L → BigBasket
+• Onion 1kg → JioMart
 
 ━━━━━━━━━━━━━━
 
@@ -164,7 +160,7 @@ def webhook():
         msg = (
             "🛒 *Welcome to Grocery Price Bot!*\n\n"
             "Send me a list of grocery items (one per line) and I'll find the best prices "
-            "across Blinkit, Zepto, Swiggy Instamart, and Amazon Fresh in India.\n\n"
+            "across BigBasket and JioMart in India.\n\n"
             "Example:\n`Milk 1L`\n`Eggs 12pcs`\n`Bread`"
         )
         send_telegram_message(chat_id, msg)
@@ -175,7 +171,7 @@ def webhook():
             "1. Type your grocery list with each item on a new line.\n"
             "2. I will search multiple platforms for you.\n"
             "3. Groq AI will analyze the results and tell you where to buy!\n\n"
-            "Currently searching: Blinkit, Zepto, Swiggy Instamart, Amazon Fresh."
+            "Currently searching: BigBasket, JioMart."
         )
         send_telegram_message(chat_id, msg)
         

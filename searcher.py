@@ -1,73 +1,84 @@
-import time
-import re
-from ddgs import DDGS
+from playwright.sync_api import sync_playwright
+import time, re
 
-def search_item_price(item_name, platform):
-    """
-    Searches DuckDuckGo for the price of a specific item on a given platform in India.
-    Returns the combined snippets and extracted prices.
-    """
-    query = f"{item_name} price {platform} India"
-    
-    all_snippets = []
-    
+def scrape_bigbasket(item):
     try:
-        with DDGS() as ddgs:
-            results = ddgs.text(query, max_results=3)
-            for r in results:
-                if 'body' in r:
-                    all_snippets.append(r['body'])
-            time.sleep(1) # sleep to avoid rate limiting
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            # Set Indian headers to avoid blocks
+            page.set_extra_http_headers({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept-Language": "en-IN,en;q=0.9"
+            })
+            
+            search_url = f"https://www.bigbasket.com/ps/?q={item.replace(' ', '+')}"
+            page.goto(search_url, timeout=15000)
+            page.wait_for_timeout(3000)
+            
+            # Extract product names and prices
+            results = []
+            products = page.query_selector_all("li.PaginateItems___StyledLi")
+            
+            for product in products[:3]:  # top 3 results
+                try:
+                    name_el = product.query_selector("h3")
+                    price_el = product.query_selector("span.Pricing___StyledLabel")
+                    if name_el and price_el:
+                        name = name_el.inner_text().strip()
+                        price = price_el.inner_text().strip()
+                        results.append(f"{name}: {price}")
+                except:
+                    continue
+            
+            browser.close()
+            return "\n".join(results) if results else "Not found"
     except Exception as e:
-        print(f"Search failed for {platform}: {e}")
-        
-    combined_text = " ".join(all_snippets)
-    
-    # Extract prices using regex
-    # Matches: ₹34, Rs 45, ₹120.50, Rs. 100, etc.
-    prices = re.findall(r'(?:₹|Rs\.?\s*)\s?\d+(?:,\d+)*(?:\.\d{1,2})?', combined_text, re.IGNORECASE)
-    # Deduplicate while preserving order
-    unique_prices = list(dict.fromkeys(prices))
-    
-    if unique_prices:
-        extracted_info = f" [EXTRACTED PRICES: {', '.join(unique_prices)}]"
-    else:
-        extracted_info = ""
-        
-    # Truncate combined_text here, THEN append extracted_info
-    # so the regex extracted prices are never cut off
-    truncated_text = combined_text[:250]
-    return truncated_text + extracted_info
+        return f"Search error: {str(e)}"
 
-def get_prices_for_item(item_name):
-    """
-    Searches across Blinkit, Zepto, Swiggy Instamart, and Amazon Fresh for an item.
-    Returns a dictionary of search result snippets for each platform.
-    """
-    platforms = ["Blinkit", "Zepto", "Swiggy Instamart", "Amazon Fresh"]
-    platform_data = {}
-    
-    for platform in platforms:
-        platform_data[platform] = search_item_price(item_name, platform)
-        
-    return platform_data
+def scrape_jiomart(item):
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_extra_http_headers({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            
+            search_url = f"https://www.jiomart.com/search/{item.replace(' ', '%20')}"
+            page.goto(search_url, timeout=15000)
+            page.wait_for_timeout(3000)
+            
+            results = []
+            products = page.query_selector_all("div.plp-card-details-name")
+            prices = page.query_selector_all("span.jm-heading-xxs")
+            
+            for i in range(min(3, len(products), len(prices))):
+                try:
+                    name = products[i].inner_text().strip()
+                    price = prices[i].inner_text().strip()
+                    results.append(f"{name}: {price}")
+                except:
+                    continue
+            
+            browser.close()
+            return "\n".join(results) if results else "Not found"
+    except Exception as e:
+        return f"Search error: {str(e)}"
+
+def get_prices_for_item(item):
+    return {
+        "BigBasket": scrape_bigbasket(item),
+        "JioMart": scrape_jiomart(item),
+    }
 
 def build_price_context(grocery_list):
-    """
-    Builds a large formatted string containing search context for all grocery items.
-    Each platform result is truncated to 250 characters for brevity.
-    """
-    full_context = []
-    
+    context = ""
     for item in grocery_list:
-        full_context.append(f"### SEARCH RESULTS FOR: {item}")
+        context += f"\n\nItem: {item}\n"
         prices = get_prices_for_item(item)
-        
         for platform, data in prices.items():
-            # Truncation is now handled inside search_item_price to preserve extracted prices
-            snippet = data if data else "No data found."
-            full_context.append(f"[{platform}]: {snippet}")
-        
-        full_context.append("-" * 20) # Separator between items
-        
-    return "\n".join(full_context)
+            context += f"{platform}:\n{data}\n"
+        time.sleep(1)
+    return context
